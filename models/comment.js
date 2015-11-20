@@ -1,14 +1,11 @@
 /*
- * image.js
- * This a comment model for my web application
  * Corinne Konoza
- * June 15, 2015
- *
+ * November 20, 2015
  */
 
-var mongoose = require('mongoose'),
-    Schema = mongoose.Schema,
-    ObjectId = Schema.ObjectId;
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var ObjectId = Schema.ObjectId;
 
 var CommentSchema = new Schema({
     image_id: {type: ObjectId},
