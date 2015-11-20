@@ -1,9 +1,6 @@
 /*
- * home.js
- * Custom module for our image controller
  * Corinne Konoza
- * June 10, 2015
- *
+ * November 20, 2015
  */
 
 
@@ -15,7 +12,7 @@ var fs = require('fs'),
 
 module.exports = {
 
-    index: function(req, res) {
+    index: function (req, res) {
 
         // declare our empty viewModel variable object
         var viewModel;
@@ -25,10 +22,10 @@ module.exports = {
         };
 
         // find the image by searching the filename matching the url
-        Models.Image.findOne({filename: {$regex: req.params.image_id} },
+        Models.Image.findOne({filename: {$regex: req.params.image_id}},
 
-            function(err, image) {
-                if (image){
+            function (err, image) {
+                if (image) {
                     // if the image was found, inc views
                     image.views = image.views + 1;
                     // save the image object to the viewModel
@@ -38,14 +35,16 @@ module.exports = {
 
                     // find any comments with matching image_id
                     Models.Comment.find({image_id: image._id}, {}, {sort: {'timestamp': 1}},
-                        function(err, comments){
-                            if (err) {throw err;}
+                        function (err, comments) {
+                            if (err) {
+                                throw err;
+                            }
 
                             // save the comments collection to the viewModel
                             viewModel.comments = comments;
 
                             // build the sidebar sending along the viewModel
-                            sidebar(viewModel, function(viewModel) {
+                            sidebar(viewModel, function (viewModel) {
                                 res.render('image', viewModel);
                             });
                         }
@@ -57,27 +56,27 @@ module.exports = {
                 }
             });
 
-        sidebar(viewModel, function(err, viewModel) {
+        sidebar(viewModel, function (err, viewModel) {
             res.render('image', viewModel);
         });
 
     },
 
-    create: function(req, res) {
+    create: function (req, res) {
 
         // save image fn creates random ID
-        var saveImage = function() {
+        var saveImage = function () {
 
             var possible = 'abcedfghijklmnopqrstuvwxyz0123456789',
                 imgUrl = '';
 
-            for (var i=0; i <6; i+1){
+            for (var i = 0; i < 6; i + 1) {
                 imgUrl += possible.charAt(Math.floor(Math.random() * possible.length));
             }
 
             // search for an image with the same filename by using find
-            Models.Image.find({filename: imgUrl }, function(err, images) {
-                if(images.length >0){
+            Models.Image.find({filename: imgUrl}, function (err, images) {
+                if (images.length > 0) {
                     // if a matching image is found, start over
                     saveImage();
                 } else {
@@ -88,8 +87,10 @@ module.exports = {
 
                     // check to make sure file is an image, if not send error msg
                     if (ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.gif') {
-                        fs.rename(tempPath, targetPath, function(err) {
-                            if (err) {throw err;}
+                        fs.rename(tempPath, targetPath, function (err) {
+                            if (err) {
+                                throw err;
+                            }
 
                             // create new Image model
                             var newImg = new Models.Image({
@@ -101,7 +102,9 @@ module.exports = {
 
                     } else {
                         fs.unlink(tempPath, function () {
-                            if (err) {throw err;}
+                            if (err) {
+                                throw err;
+                            }
 
                             res.json(500, {error: 'Only image files are allowed.'});
                         });
@@ -115,64 +118,70 @@ module.exports = {
     },
 
 
-    like: function(req, res) {
+    like: function (req, res) {
 
-         Models.Image.findOne({filename: {$regex: req.params.image_id}},
-            function(err, image) {
-                if(!err && image) {
+        Models.Image.findOne({filename: {$regex: req.params.image_id}},
+            function (err, image) {
+                if (!err && image) {
                     image.likes = image.likes + 1;
                     image.save(function (err) {
-                      if (err) {
-                        res.json(err);
+                        if (err) {
+                            res.json(err);
                         } else {
-                        res.json({likes: image.likes});
+                            res.json({likes: image.likes});
                         }
                     });
                 }
-         });
+            });
     },
 
 
-    comment: function(req, res){
+    comment: function (req, res) {
 
-         Models.Image.findOne({filename: {$regex: req.params.image_id }},
-             function(err, image) {
-                 if(!err && image){
-                     var newComment = new Models.Comment(req.body);
-                     newComment.gravatar = md5(newComment.email);
-                     newComment.image_id = image._id;
-                     newComment.save(function(err, comment) {
-                         if(err) {throw err;}
-                         res.redirect('/images/' + image.uniqueId + '#' + comment._id);
-                     });
-                 } else {
-                     res.redirect('/');
-                 }
-             });
+        Models.Image.findOne({filename: {$regex: req.params.image_id}},
+            function (err, image) {
+                if (!err && image) {
+                    var newComment = new Models.Comment(req.body);
+                    newComment.gravatar = md5(newComment.email);
+                    newComment.image_id = image._id;
+                    newComment.save(function (err, comment) {
+                        if (err) {
+                            throw err;
+                        }
+                        res.redirect('/images/' + image.uniqueId + '#' + comment._id);
+                    });
+                } else {
+                    res.redirect('/');
+                }
+            });
     },
 
 
-    remove: function(req, res){
+    remove: function (req, res) {
 
-        Models.Image.findOne({ filename: { $regex: req.params.image_id }},
-            function(err, image){
-                if (err) {throw err;}
+        Models.Image.findOne({filename: {$regex: req.params.image_id}},
+            function (err, image) {
+                if (err) {
+                    throw err;
+                }
 
                 fs.unlink(path.resolve('./public/upload/' + image.filename),
-                function(err) {
-                    if(err) {throw err;}
+                    function (err) {
+                        if (err) {
+                            throw err;
+                        }
 
-                    Models.Comment.remove({ image_id: image._id},
-                    function(err){
-                        image.remove(function(err) {
-                            if (!err) {
-                                res.json(true);
-                            } else {
-                                res.json(false);
-                            }
-                        });
+                        Models.Comment.remove({image_id: image._id},
+                            function (err) {
+                                image.remove(function (err) {
+                                    if (!err) {
+                                        res.json(true);
+                                    } else {
+                                        res.json(false);
+                                    }
+                                });
+                            });
                     });
-                });
             });
     }
 };
