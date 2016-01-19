@@ -1,178 +1,226 @@
-/*
- * home.js
- * Custom module for our image controller
- * Corinne Konoza
- * June 10, 2015
- *
- */
-
-
-// Requirements
-var fs = require('fs'),
-    path = require('path'),
-    sidebar = require('../helpers/sidebar'),
-    Models = require('../models');
+var fs = require('fs');
+var path = require('path');
+var sidebar = require('../helpers/sidebar');
+var Image = require('../models/image');
+var Comment = require('../models/comment');
 
 module.exports = {
 
-    index: function(req, res) {
+  index: function(req, res) {
+    var viewModel;
+    viewModel = {
+      image: {},
+      comments: []
+    };
 
-        // declare our empty viewModel variable object
-        var viewModel;
-        viewModel = {
-            image: {},
-            comments: []
-        };
+    Image.findOne({
+      filename: {
+        $regex: req.params.image_id
+      }
+    }).exec(function(err, image) {
+      if (!image)
+        return res.redirect('/');
 
-        // find the image by searching the filename matching the url
-        Models.Image.findOne({filename: {$regex: req.params.image_id} },
 
-            function(err, image) {
-                if (image){
-                    // if the image was found, inc views
-                    image.views = image.views + 1;
-                    // save the image object to the viewModel
-                    viewModel.image = image;
-                    // save the model after updating
-                    image.save();
+      image.views = image.views + 1;
+      viewModel.image = image;
+      image.save();
 
-                    // find any comments with matching image_id
-                    Models.Comment.find({image_id: image._id}, {}, {sort: {'timestamp': 1}},
-                        function(err, comments){
-                            if (err) {throw err;}
+      Comment.find({
+        image_id: image._id
+      }).sort({
+        'timestamp': 1
+      }).exec(function(err, comments) {
+        if (err) {
+          console.log(err);
+          return res.json(500, {
+            error: err
+          });
+        }
 
-                            // save the comments collection to the viewModel
-                            viewModel.comments = comments;
+        viewModel.comments = comments;
 
-                            // build the sidebar sending along the viewModel
-                            sidebar(viewModel, function(viewModel) {
-                                res.render('image', viewModel);
-                            });
-                        }
-                    );
-
-                } else {
-                    // if no image was found, return to homepage
-                    res.redirect('/');
-                }
-            });
-
-        sidebar(viewModel, function(err, viewModel) {
-            res.render('image', viewModel);
+        sidebar(viewModel, function(viewModel) {
+          res.render('image', viewModel);
         });
+      });
+    });
 
-    },
+    sidebar(viewModel, function(err, viewModel) {
+      res.render('image', viewModel);
+    });
 
-    create: function(req, res) {
+  },
 
-        // save image fn creates random ID
-        var saveImage = function() {
+  create: function(req, res) {
+    console.log(req);
 
-            var possible = 'abcedfghijklmnopqrstuvwxyz0123456789',
-                imgUrl = '';
+    var saveImage = function() {
+      console.log('saveImage was called');
+      var possible = 'abcedfghijklmnopqrstuvwxyz0123456789';
+      var imgUrl = '';
 
-            for (var i=0; i <6; i+1){
-                imgUrl += possible.charAt(Math.floor(Math.random() * possible.length));
+      for (var i = 0; i < 6; i + 1) {
+        imgUrl += possible.charAt(Math.floor(Math.random() * possible.length));
+      }
+
+      console.log(imgUrl);
+
+      Image.find({
+        filename: imgUrl
+      }).exec(function(err, images) {
+        if (images.length > 0) {
+          return saveImage();
+        }
+
+        var tempPath = req.files.file.path;
+        var ext = path.extname(req.files.file.name).toLowerCase();
+        var targetPath = path.resolve('./public/upload' + imgUrl + ext);
+
+        var allowed = ['.png', '.jpg', '.jpeg', '.gif'];
+        if (allowed.indexOf(ext) > -1) {
+          fs.rename(tempPath, targetPath, function(err) {
+            if (err) {
+              console.log(err);
+              return res.json(500, {
+                error: err
+              });
             }
 
-            // search for an image with the same filename by using find
-            Models.Image.find({filename: imgUrl }, function(err, images) {
-                if(images.length >0){
-                    // if a matching image is found, start over
-                    saveImage();
-                } else {
 
-                    var tempPath = req.files.file.path,
-                        ext = path.extname(req.files.file.name).toLowerCase(),
-                        targetPath = path.resolve('./public/upload' + imgUrl + ext);
-
-                    // check to make sure file is an image, if not send error msg
-                    if (ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.gif') {
-                        fs.rename(tempPath, targetPath, function(err) {
-                            if (err) {throw err;}
-
-                            // create new Image model
-                            var newImg = new Models.Image({
-                                title: req.body.title,
-                                filename: imgUrl + ext,
-                                description: req.body.description
-                            });
-                        });
-
-                    } else {
-                        fs.unlink(tempPath, function () {
-                            if (err) {throw err;}
-
-                            res.json(500, {error: 'Only image files are allowed.'});
-                        });
-                    }
-                }
+            var newImg = new Image({
+              title: req.body.title,
+              filename: imgUrl + ext,
+              description: req.body.description
             });
-
-        };
-
-        saveImage();
-    },
-
-
-    like: function(req, res) {
-
-         Models.Image.findOne({filename: {$regex: req.params.image_id}},
-            function(err, image) {
-                if(!err && image) {
-                    image.likes = image.likes + 1;
-                    image.save(function (err) {
-                      if (err) {
-                        res.json(err);
-                        } else {
-                        res.json({likes: image.likes});
-                        }
-                    });
-                }
-         });
-    },
-
-
-    comment: function(req, res){
-
-         Models.Image.findOne({filename: {$regex: req.params.image_id }},
-             function(err, image) {
-                 if(!err && image){
-                     var newComment = new Models.Comment(req.body);
-                     newComment.gravatar = md5(newComment.email);
-                     newComment.image_id = image._id;
-                     newComment.save(function(err, comment) {
-                         if(err) {throw err;}
-                         res.redirect('/images/' + image.uniqueId + '#' + comment._id);
-                     });
-                 } else {
-                     res.redirect('/');
-                 }
-             });
-    },
-
-
-    remove: function(req, res){
-
-        Models.Image.findOne({ filename: { $regex: req.params.image_id }},
-            function(err, image){
-                if (err) {throw err;}
-
-                fs.unlink(path.resolve('./public/upload/' + image.filename),
-                function(err) {
-                    if(err) {throw err;}
-
-                    Models.Comment.remove({ image_id: image._id},
-                    function(err){
-                        image.remove(function(err) {
-                            if (!err) {
-                                res.json(true);
-                            } else {
-                                res.json(false);
-                            }
-                        });
-                    });
+            newImg.save(function(err, image) {
+              if (err) {
+                console.log(err);
+                return res.json(500, {
+                  error: err
                 });
+              }
+              console.log('image saved!');
             });
-    }
+          });
+
+        } else {
+          fs.unlink(tempPath, function() {
+            if (err) {
+              console.log(err);
+              return res.json(500, {
+                error: err
+              });
+            }
+
+            res.json(500, {
+              error: 'Only image files are allowed.'
+            });
+          });
+        }
+      });
+    };
+
+    saveImage();
+  },
+
+
+  like: function(req, res) {
+
+    Image.findOne({
+      filename: {
+        $regex: req.params.image_id
+      }
+    }).exec(function(err, image) {
+      if (err || !image) {
+        console.log(err);
+        return res.json(500, {
+          error: 'There was a problem liking this image.'
+        });
+      }
+
+
+      image.likes = image.likes + 1;
+      image.save(function(err) {
+        if (err) {
+          console.log(err);
+          return res.json(500, {
+            error: err
+          });
+        }
+        res.json({
+          likes: image.likes
+        });
+      });
+    });
+  },
+
+
+  comment: function(req, res) {
+
+    Image.findOne({
+      filename: {
+        $regex: req.params.image_id
+      }
+    }).exec(function(err, image) {
+      if (err || !image) {
+        console.log(err);
+        return res.json(500, {
+          error: 'There was a problem commenting on this image.'
+        });
+      }
+
+      var newComment = new Models.Comment(req.body);
+      newComment.gravatar = md5(newComment.email);
+      newComment.image_id = image._id;
+      newComment.save(function(err, comment) {
+        if (err) {
+          console.log(err);
+          return res.json(500, {
+            error: "Problem saving your comment"
+          });
+        }
+        res.redirect('/images/' + image.uniqueId + '#' + comment._id);
+      });
+    });
+  },
+
+
+  remove: function(req, res) {
+
+    Image.findOne({
+      filename: {
+        $regex: req.params.image_id
+      }
+    }).exec(function(err, image) {
+      if (err) {
+        console.log(err);
+        return res.json(500, {
+          error: 'Problem looking for image'
+        });
+      }
+
+      fs.unlink(path.resolve('./public/upload/' + image.filename),
+        function(err) {
+          if (err) {
+            console.log(err);
+            return res.json(500, {
+              error: 'Problem removing image'
+            });
+          }
+
+          Comment.remove({
+            image_id: image._id
+          }).exec(function(err) {
+            image.remove(function(err) {
+              if (!err) {
+                res.json(true);
+              } else {
+                res.json(false);
+              }
+            });
+          });
+        });
+    });
+  }
 };
