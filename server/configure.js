@@ -4,7 +4,6 @@ var exphbs = require('express3-handlebars');
 var express = require('express');
 var bodyParser = require('body-parser');
 var cookieParser = require('cookie-parser');
-var methodOverride = require('method-override');
 var morgan = require('morgan');
 var moment = require('moment');
 var errorHandler = require('errorhandler');
@@ -30,15 +29,12 @@ module.exports = function(app) {
   app.use(bodyParser.text({
     uploadDir: path.join(__dirname, '../public/upload/temp')
   }));
-  app.use(bodyParser.json({
-    extended: true
-  }));
+  app.use(bodyParser.json());
   app.use(bodyParser.urlencoded({
     extended: true
   }));
+  app.use(cookieParser());
 
-  app.use(methodOverride());
-  app.use(cookieParser('some-secret-value-here'));
 
   routes.initialize(app, new express.Router());
   app.use('/public/', express.static(path.join(__dirname, '../public')));

@@ -53,10 +53,10 @@ module.exports = {
   },
 
   create: function(req, res) {
-    console.log(req);
+    console.log(req.body);
+    console.log(req.file);
 
     var saveImage = function() {
-      console.log('saveImage was called');
       var possible = 'abcedfghijklmnopqrstuvwxyz0123456789';
       var imgUrl = '';
 

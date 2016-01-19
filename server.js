@@ -1,11 +1,3 @@
-/*
- * server.js
- * This is the server for my web application
- * Corinne Konoza
- * June 9, 2015
- *
- */
-
 var express = require('express');
 var config = require('./server/configure');
 var app = express();
